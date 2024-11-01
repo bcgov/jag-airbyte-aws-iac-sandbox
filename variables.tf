@@ -28,24 +28,6 @@ variable "environment" {
   default     = "production"
 }
 
-variable "enable_cluster_encryption" {
-  description = "Enable envelope encryption for cluster secrets"
-  type        = bool
-  default     = true
-}
-
-variable "node_groups_defaults" {
-  description = "Map of default configurations for all node groups"
-  type = object({
-    disk_size      = number
-    instance_types = list(string)
-  })
-  default = {
-    disk_size      = 100
-    instance_types = ["t3.xlarge"]
-  }
-}
-
 variable "db_username" {
   description = "Username for RDS instance"
   type        = string

@@ -47,43 +47,15 @@ module "eks" {
       instance_types = ["t3.xlarge"]
       capacity_type  = "ON_DEMAND"
 
-      # Add recommended labels for Airbyte workloads
       labels = {
         Environment = var.environment
         "airbyte.io/workload-type" = "general"
-      }
-
-      # Add taints to ensure Airbyte pods land on correct nodes
-      taints = []
-
-      # Add additional security groups if needed
-      additional_security_group_ids = []
-    }
-    
-    # Add dedicated node group for Airbyte workers
-    workers = {
-      desired_size = 2
-      min_size     = 1
-      max_size     = 5
-
-      instance_types = ["t3.2xlarge"]
-      capacity_type  = "ON_DEMAND"
-
-      labels = {
-        Environment = var.environment
-        "airbyte.io/workload-type" = "worker"
       }
     }
   }
 
   # Enable OIDC provider for service account integration
   enable_irsa = true
-
-  # Add cluster encryption
-  cluster_encryption_config = [{
-    provider_key_arn = aws_kms_key.eks.arn
-    resources        = ["secrets"]
-  }]
 
   # Update EKS module configuration to enable logging
   cluster_enabled_log_types = [
@@ -93,18 +65,6 @@ module "eks" {
     "controllerManager",
     "scheduler"
   ]
-}
-
-# Add KMS key for cluster encryption
-resource "aws_kms_key" "eks" {
-  description             = "EKS Secret Encryption Key"
-  deletion_window_in_days = 7
-  enable_key_rotation     = true
-
-  tags = {
-    Environment = var.environment
-    Terraform   = "true"
-  }
 }
 
 # Add RDS subnet group
@@ -140,21 +100,21 @@ resource "aws_security_group" "rds" {
 # Add RDS instance
 resource "aws_db_instance" "airbyte" {
   identifier        = "${var.cluster_name}-db"
-  engine            = "postgres"
-  engine_version    = "13.7"
-  instance_class    = "db.t3.medium"
-  allocated_storage = 20
-
-  db_name  = "airbyte"
-  username = var.db_username
-  password = var.db_password
-
-  db_subnet_group_name   = aws_db_subnet_group.airbyte.name
+  engine           = "postgres"
+  engine_version   = "13.7"
+  instance_class   = "db.t3.large"
+  allocated_storage = 100
+  
+  db_name          = "airbyte"
+  username         = var.db_username
+  password         = var.db_password
+  
   vpc_security_group_ids = [aws_security_group.rds.id]
-
+  db_subnet_group_name   = aws_db_subnet_group.airbyte.name
+  
   backup_retention_period = 7
-  skip_final_snapshot    = true
-
+  multi_az               = false
+  
   tags = {
     Environment = var.environment
     Terraform   = "true"
@@ -163,7 +123,7 @@ resource "aws_db_instance" "airbyte" {
 
 # S3 bucket for state storage
 resource "aws_s3_bucket" "state" {
-  bucket = "${var.cluster_name}-state-${data.aws_caller_identity.current.account_id}"
+  bucket = "${var.cluster_name}-storage-${data.aws_caller_identity.current.account_id}"
 
   tags = {
     Environment = var.environment
@@ -176,17 +136,6 @@ resource "aws_s3_bucket_versioning" "state" {
   bucket = aws_s3_bucket.state.id
   versioning_configuration {
     status = "Enabled"
-  }
-}
-
-# Enable encryption
-resource "aws_s3_bucket_server_side_encryption_configuration" "state" {
-  bucket = aws_s3_bucket.state.id
-
-  rule {
-    apply_server_side_encryption_by_default {
-      sse_algorithm = "AES256"
-    }
   }
 }
 

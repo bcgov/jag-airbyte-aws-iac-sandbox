@@ -1,0 +1,34 @@
+global:
+  serviceAccountName: "airbyte-admin"
+  airbyteUrl: "http://${aws_lb.airbyte.dns_name}"
+  edition: "enterprise"
+  storage:
+    type: "S3"
+    bucket:
+      log: "${aws_s3_bucket.state.id}"
+      state: "${aws_s3_bucket.state.id}"
+      workloadOutput: "${aws_s3_bucket.state.id}"
+    s3:
+      region: "${var.aws_region}"
+      authenticationType: "instance-profile"
+  database:
+    host: "${aws_db_instance.airbyte.address}"
+    port: 5432
+    database: "airbyte"
+    username: "${var.db_username}"
+    password: "${var.db_password}"
+
+# Configure ingress
+ingress:
+  enabled: true
+  className: "alb"
+  annotations:
+    kubernetes.io/ingress.class: "alb"
+    alb.ingress.kubernetes.io/scheme: "internet-facing"
+    alb.ingress.kubernetes.io/target-type: "ip"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+
+# Tags for resources
+tags:
+  Environment: "${var.environment}"
+  Terraform: "true"
